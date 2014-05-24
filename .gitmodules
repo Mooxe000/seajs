@@ -1,0 +1,3 @@
+[submodule "seacoffee"]
+	path = seacoffee
+	url = git@github.com:Mooxe000/seacoffee.git
