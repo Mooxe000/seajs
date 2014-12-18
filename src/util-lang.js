@@ -17,4 +17,3 @@ var _cid = 0
 function cid() {
   return _cid++
 }
-

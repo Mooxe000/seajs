@@ -30,6 +30,7 @@ var STATUS = Module.STATUS = {
 function Module(uri, deps) {
   this.uri = uri
   this.dependencies = deps || []
+  this.deps = {} // Ref the dependence modules
   this.status = 0
 
   this._entry = []
@@ -47,17 +48,16 @@ Module.prototype.resolve = function() {
   return uris
 }
 
-Module.prototype.pass = function(uris) {
+Module.prototype.pass = function() {
   var mod = this
 
-  uris = uris || mod.resolve()
-  var len = uris.length
+  var len = mod.dependencies.length
 
   for (var i = 0; i < mod._entry.length; i++) {
     var entry = mod._entry[i]
     var count = 0
     for (var j = 0; j < len; j++) {
-      var m = Module.get(uris[j])
+      var m = mod.deps[mod.dependencies[j]]
       // If the module is unload and unused in the entry, pass entry to it
       if (m.status < STATUS.LOADED && !entry.history.hasOwnProperty(m.uri)) {
         entry.history[m.uri] = true
@@ -92,8 +92,12 @@ Module.prototype.load = function() {
   var uris = mod.resolve()
   emit("load", uris)
 
+  for (var i = 0, len = uris.length; i < len; i++) {
+    mod.deps[mod.dependencies[i]] = Module.get(uris[i])
+  }
+
   // Pass entry to it's dependencies
-  mod.pass(uris)
+  mod.pass()
 
   // If module has entries not be passed, call onload
   if (mod._entry.length) {
@@ -105,7 +109,7 @@ Module.prototype.load = function() {
   var requestCache = {}
   var m
 
-  for (var i = 0, len = uris.length; i < len; i++) {
+  for (i = 0; i < len; i++) {
     m = cachedMods[uris[i]]
 
     if (m.status < STATUS.FETCHING) {
@@ -174,7 +178,7 @@ Module.prototype.exec = function () {
   var uri = mod.uri
 
   function require(id) {
-    var m = Module.get(require.resolve(id))
+    var m = mod.deps[id] || Module.get(require.resolve(id))
     if (m.status == STATUS.ERROR) {
       throw new Error('module was broken: ' + m.uri);
     }
@@ -210,7 +214,7 @@ Module.prototype.exec = function () {
   // Emit `exec` event
   emit("exec", mod)
 
-  return exports
+  return mod.exports
 }
 
 // Fetch a module
@@ -244,7 +248,8 @@ Module.prototype.fetch = function(requestCache) {
     uri: uri,
     requestUri: requestUri,
     onRequest: onRequest,
-    charset: data.charset
+    charset: isFunction(data.charset) ? data.charset(requestUri) || 'utf-8' : data.charset,
+    crossorigin: isFunction(data.crossorigin) ? data.crossorigin(requestUri) : data.crossorigin
   })
 
   if (!emitData.requested) {
@@ -254,7 +259,7 @@ Module.prototype.fetch = function(requestCache) {
   }
 
   function sendRequest() {
-    seajs.request(emitData.requestUri, emitData.onRequest, emitData.charset)
+    seajs.request(emitData.requestUri, emitData.onRequest, emitData.charset, emitData.crossorigin)
   }
 
   function onRequest(error) {
@@ -327,7 +332,7 @@ Module.define = function (id, deps, factory) {
   }
 
   // Try to derive uri in IE6-9 for anonymous modules
-  if (!meta.uri && doc.attachEvent && typeof getCurrentScript !== "undefined") {
+  if (!isWebWorker && !meta.uri && doc.attachEvent && typeof getCurrentScript !== "undefined") {
     var script = getCurrentScript()
 
     if (script) {
@@ -421,4 +426,3 @@ seajs.require = function(id) {
   }
   return mod.exports
 }
-

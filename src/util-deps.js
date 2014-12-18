@@ -15,7 +15,7 @@ function parseDependencies(s) {
     }
     else if(isQuote()) {
       dealQuote()
-      isReg = true
+      isReg = 1
     }
     else if(peek == '/') {
       readch()
@@ -24,11 +24,15 @@ function parseDependencies(s) {
         if(index == -1) {
           index = s.length
         }
-        isReg = 1
       }
       else if(peek == '*') {
-        index = s.indexOf('*/', index) + 2
-        isReg = 1
+        index = s.indexOf('*/', index)
+        if(index == -1) {
+          index = length
+        }
+        else {
+          index += 2
+        }
       }
       else if(isReg) {
         dealReg()
@@ -71,7 +75,10 @@ function parseDependencies(s) {
     var start = index
     var c = peek
     var end = s.indexOf(c, start)
-    if(s.charAt(end - 1) != '\\') {
+    if(end == -1) {
+      index = length
+    }
+    else if(s.charAt(end - 1) != '\\') {
       index = end + 1
     }
     else {
@@ -147,7 +154,7 @@ function parseDependencies(s) {
       index += r.length - 2
     }
     else {
-      index += /^[\w$.\s]+/.exec(s2)[0].length - 1
+      index += /^[\w$]+(?:\s*\.\s*[\w$]+)*/.exec(s2)[0].length - 1
     }
   }
   function isNumber() {
